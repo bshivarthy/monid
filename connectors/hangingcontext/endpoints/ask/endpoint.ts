@@ -17,5 +17,13 @@ export default defineEndpoint({
         docsUrl: "https://hangingcontext.com/developers/",
     },
     request: { method: "GET", path: "/ask" },
-    input: { schema: { queryParams: zHangingContextAskQueryParams } },
+    input: {
+        schema: {
+            // Our tightening (D25): without `query` the vendor returns a
+            // help page, which answers nothing, so the caller must ask.
+            queryParams: zHangingContextAskQueryParams.required({
+                query: true,
+            }),
+        },
+    },
 });

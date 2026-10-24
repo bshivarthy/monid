@@ -3,6 +3,7 @@ import { fromFileUrl } from "@std/path";
 import { loadFixture, runEndpoint, testSealedUnit } from "@shared/testing";
 
 const fixturesDir = fromFileUrl(new URL("./fixtures/", import.meta.url));
+/** Keyless: gate live tests on network permission (see ask's test). */
 const noNet = Deno.permissions.querySync({ name: "net" }).state !==
     "granted";
 
@@ -24,6 +25,21 @@ Deno.test("hangingcontext#latest happy (recorded 2026-10-24): the edition, FREE 
     assert(Array.isArray(output.newsrooms), "topics listed");
 });
 
+Deno.test("hangingcontext#latest provider error (synthetic): 503 is data, zero usage", async () => {
+    const unit = await testSealedUnit("hangingcontext#latest");
+    const fixture = await loadFixture(
+        `${fixturesDir}synthetic-provider-error.json`,
+    );
+    const result = await runEndpoint({
+        unit,
+        input: {},
+        mode: "replay",
+        fixture,
+    });
+    assertEquals(result.isProviderError, true);
+    assertEquals(result.usage, { credits: {}, evidence: {} });
+});
+
 Deno.test({
     name: "hangingcontext#latest live (keyless; needs --allow-net)",
     ignore: noNet,
@@ -35,6 +51,7 @@ Deno.test({
             false,
             JSON.stringify(result.output),
         );
+        assertEquals(result.usage, { credits: {}, evidence: {} });
         assert(
             Array.isArray((result.output as Record<string, unknown>).stories),
             "stories array present",

@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals, assertRejects } from "@std/assert";
 import { fromFileUrl } from "@std/path";
 import {
     loadFixture,
@@ -9,8 +9,10 @@ import {
 
 const fixturesDir = fromFileUrl(new URL("./fixtures/", import.meta.url));
 
-/** Hanging Context is keyless, so a live test needs only the network: it
- *  runs under `deno task test:live` (--allow-net) and is ignored otherwise. */
+/** Hanging Context is keyless: there is no credential for `liveSkip` to
+ *  find (its default field is `apiKey`, and an empty field list always
+ *  skips), so live tests gate on network permission instead — they run
+ *  under `deno task test:live` (--allow-net) and are ignored otherwise. */
 const noNet = Deno.permissions.querySync({ name: "net" }).state !==
     "granted";
 
@@ -60,6 +62,36 @@ Deno.test("hangingcontext#ask happy (recorded 2026-10-24): cited matches, FREE s
     assert((output.results as unknown[]).length > 0, "results present");
 });
 
+Deno.test("hangingcontext#ask schema gate: query is required and non-empty at the binding", async () => {
+    const unit = await testSealedUnit("hangingcontext#ask");
+    const fixture = await loadFixture(`${fixturesDir}happy.json`);
+    const bad: Record<string, string>[] = [{}, { query: "" }];
+    for (const queryParams of bad) {
+        await assertRejects(
+            () =>
+                runEndpoint({
+                    unit,
+                    input: { queryParams },
+                    mode: "replay",
+                    fixture,
+                }),
+            Error,
+            "INVALID_INPUT",
+        );
+    }
+    // near-twin: a one-character question passes validation (it fails
+    // later, at replay URL matching — proving the schema let it through)
+    const error = await assertRejects(() =>
+        runEndpoint({
+            unit,
+            input: { queryParams: { query: "f" } },
+            mode: "replay",
+            fixture,
+        })
+    );
+    assertEquals(String(error).includes("INVALID_INPUT"), false, String(error));
+});
+
 Deno.test("hangingcontext#ask no match (recorded 2026-10-24): empty results are data, zero usage", async () => {
     const unit = await testSealedUnit("hangingcontext#ask");
     const fixture = await loadFixture(`${fixturesDir}no-match.json`);
@@ -74,6 +106,21 @@ Deno.test("hangingcontext#ask no match (recorded 2026-10-24): empty results are 
     const output = result.output as Record<string, unknown>;
     assertEquals(output.no_match, true);
     assertEquals(output.results, []);
+});
+
+Deno.test("hangingcontext#ask provider error (synthetic): 503 is data, zero usage", async () => {
+    const unit = await testSealedUnit("hangingcontext#ask");
+    const fixture = await loadFixture(
+        `${fixturesDir}synthetic-provider-error.json`,
+    );
+    const result = await runEndpoint({
+        unit,
+        input: { queryParams: { query: "anything" } },
+        mode: "replay",
+        fixture,
+    });
+    assertEquals(result.isProviderError, true);
+    assertEquals(result.usage, { credits: {}, evidence: {} });
 });
 
 Deno.test({

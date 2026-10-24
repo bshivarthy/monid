@@ -11,8 +11,9 @@ export default defineEndpoint({
             "and Markdown copies. Topics: artificial-intelligence, " +
             "research-science, finance-investing, business-podcasts, " +
             "health-biotech, sports, federal-government, state-government, " +
-            "energy-climate, culture-media. The list can be long; filter " +
-            "on published_at for a time window.",
+            "energy-climate, culture-media (the live list is in Latest " +
+            "Stories). An unknown slug returns a 404. The list can be " +
+            "long; filter on published_at for a time window.",
         docsUrl: "https://hangingcontext.com/developers/",
     },
     /** PUBLIC identity: the native path carries a `{topic}` placeholder,
